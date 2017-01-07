@@ -1,5 +1,7 @@
 # Coupled_gas_water_flow_and_transport_porous_media
 
+![Preview](https://numericalenvironmental.files.wordpress.com/2017/01/summary-model-equations.jpg?w=816)
+
 This Julia language (version 0.5) script solves the coupled partial differential equations associated with (1) compressible gas flow in partially water-saturated porous media, (2) partially-saturated flow of water (essentially amounting to a solution of the Richards equation using the Van Genuchten equations for capillarity and relative permeability), and (3) advective-dispersive transport of both aqueous-phase solutes and gas components in the respective media. Currently, exchanges of component mass between phases is not modeled; this feature will be added later when the script is used as the basis for a full multiphase reactive transport model. Other limitations include an isotropic aqueous dispersivity and the neglect of flow driven by density differences.
 
 The model is based on the integral finite difference method, which entails a numerical mesh consisting of arbitrary shapes and properties. The flow and transport equations are solved implicitly with respect to time, using Julia’s built-in sparse matrix algebra capabilities. The following tab-delimited text input files are required to set up and execute the code:
