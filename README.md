@@ -1,0 +1,2 @@
+# Coupled_gas_water_flow_and_transport_porous_media
+This Julia language (version 0.5) script solves the coupled partial differential equations associated with (1) compressible gas flow in partially water-saturated porous media, (2) partially-saturated flow of water (essentially amounting to a solution of the Richards equation using the Van Genuchten equations for capillarity and relative permeability), and (3) advective-dispersive transport of both aqueous-phase solutes and gas components in the respective media.
