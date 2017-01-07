@@ -18,7 +18,7 @@ Two separate example problems are supplied. The top-level folder entails files a
 
 This script is a prototype and has not been tested yet beyond the rudimentary checks noted above. It is intended to be used for more interesting reactive transport problems later, after additional work. Feel free to download and modify, with this caveat in mind. I’d appreciate input on efficiency improvements and bug fixes.
 
-More background information can be found here: (link coming soon)
+More background information can be found here: https://numericalenvironmental.wordpress.com/2017/01/07/two-phase-reactive-transport-model-development-with-julia-part-2-a-fully-coupled-multicomponent-integral-finite-difference-model/)
 
 I'd appreciate hearing back from you if you find the script useful. Questions or comments are welcome at walt.mcnab@gmail.com.
 
