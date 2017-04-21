@@ -1,8 +1,7 @@
 ####################################################################################################
 #
-# gw_trans.jl - a julia-language script to model the (1) coupled advection of gas and
-# water, and (2) diffusive-dispersive component transport (both phases) in partially water-saturated
-# porous media
+# gas_water_trans.jl - a julia-language script to model the (1) coupled advection of gas and
+# water, and (2) diffusive-dispersive component transport in partially water-saturated porous media
 #
 # model is not currently set up to handle fully water-saturated conditions
 #
@@ -105,7 +104,7 @@ end
 
 
 function ReadSource(source_flag::Int64)::Array{Float64, 2}
-	# read source term file (for gases or aqueous components) and return source array
+	# read source file (for gases or aqueous components) and return distribution array
 	if source_flag == 1
 		infile = "source_gas.txt"
 	else
@@ -124,7 +123,7 @@ end
 
 
 function ReadComps()
-	# read in component properties (used for gases and to define aqueous components)
+	# read in component properties, return separate items for gases and aqueous components
 	comp = Component[]
 	gas = Component[]
 	data = readdlm("components.txt", '\t', header=true)
@@ -148,7 +147,7 @@ end
 function GetKnobs()::Knobs
 	# read numerical model "knobs" from file
 	data = readdlm("knobs.txt", '\t', header=false)
-	gamma = Float64(data[1, 2])							# time-stepping constraints
+	gamma = Float64(data[1, 2])
 	dt_init = Float64(data[2, 2])
 	dt_min = Float64(data[3, 2])
 	dt_max = Float64(data[4, 2])
@@ -156,7 +155,7 @@ function GetKnobs()::Knobs
 	dPc_max = Float64(data[6, 2])	
 	dt_decrease = Float64(data[7, 2])
 	dt_increase = Float64(data[8, 2])
-	upw_w = Float64(data[9, 2]) 						# upstream weighting factors for advective transport
+	upw_w = Float64(data[9, 2])
 	upw_g = Float64(data[10, 2])	
 	knobs = Knobs(gamma, dt_init, dt_min, dt_max, dP_max, dPc_max, dt_decrease, dt_increase, upw_w, upw_g)
 	println("Read in computational knobs.")
@@ -166,7 +165,7 @@ end
 
 function ReadNodes(num_comps::Int64, num_gas::Int64, S_gMW::Array{Float64,1})
 
-	# read in nodes file (properties associated with each volume element) and populate node type array
+	# read in nodes file and populate node type array
 	node = Node[]
 	num_nodes = 0
 	sigma_x = zeros(Float64, num_gas) 					# initialize total gas component transport conductance array (with respect to each gas phase)
@@ -206,8 +205,8 @@ function ReadNodes(num_comps::Int64, num_gas::Int64, S_gMW::Array{Float64,1})
 		end		
 		for j = 1:num
 			# for each like node; connecting node list and sigma terms will be created later from connections		
-			push!(node, Node(x+j*x_step, y+j*y_step, z+j*z_step, vol, k, 0., 0., phi, n, m, alpha, Sr, Q_index,
-				Q, F_index, F, alpha_L, P, 0., S, Xg, C_g, C_aq, Tuple{Int64, Int64}[], 0., 0., 0., sigma_x, 0., 0., 0., 0.))
+			push!(node, Node(x+(j-1)*x_step, y+(j-1)*y_step, z+(j-1)*z_step, vol, k, 0., 0., phi, n, m, alpha, Sr, Q_index,
+				Q, F_index, F, alpha_L, P, 0., S, copy(Xg), copy(C_g), copy(C_aq), Tuple{Int64, Int64}[], 0., 0., 0., copy(sigma_x), 0., 0., 0., 0.))
 			node[end].Pc = PCap(node[end])
 			num_nodes += 1
 		end
@@ -234,10 +233,9 @@ end
 
 function ReadConnects(node::Array{Node,1}, num_nodes::Int64, gas::Array{Component,1}, num_gas::Int64, knobs::Knobs)
 
-	# read in volume element connections file and populate node type array
+	# read in connections file and populate node type array
 	connect = Connect[]
 	num_connects = 0
-	conduct_x = zeros(Float64, num_gas)
 	data = readdlm("connects.txt", '\t', header=true)
 	for i = 1:size(data[1], 1)
 		node_1 = Int64(data[1][i, 1])
@@ -253,7 +251,7 @@ function ReadConnects(node::Array{Node,1}, num_nodes::Int64, gas::Array{Componen
 			conduct_c = Conduct_c(conduct_w, node_1, node_2, node, dx, area, knobs, num_nodes) 		# aqueous chemical transport conductance
 			conduct_x = Conduct_x(node, i, j, dx, area, gas, num_gas) 								# gaseous chemical transport conductance (array of size num_gas)
 			# for each like connection; note that advective fluxes are assigned later (set to zero initially, here)
-			push!(connect, Connect(node_1+j*step_1, node_2+j*step_2, dx, area, conduct_w, conduct_g, conduct_c, conduct_x, 0., 0.)) 	
+			push!(connect, Connect(node_1+(j-1)*step_1, node_2+(j-1)*step_2, dx, area, conduct_w, conduct_g, conduct_c, conduct_x, 0., 0.)) 	
 			num_connects += 1
 		end
 	end
@@ -386,8 +384,8 @@ end
 function Conduct_x(node::Array{Node, 1}, i::Int64, j::Int64, dx::Float64, area::Float64, gas::Array{Component, 1}, num_gas::Int64)::Array{Float64, 1}
 	# compute/update gas-phase diffusive conductance between two nodes (returns an array of size num_gas)
 	cx = zeros(Float64, num_gas)
-	for i = 1:num_gas
-		cx[i] = mean([node[i].phi * (1. - node[i].S), node[j].phi * (1. - node[j].S)]) * gas[i].D * area / dx
+	for k = 1:num_gas
+		cx[k] = mean([node[i].phi * (1. - node[i].S), node[j].phi * (1. - node[j].S)]) * gas[k].D * area / dx
 	end
 	return cx
 end
@@ -545,15 +543,9 @@ function Monitor(t::Float64, node_i::Node, num_comps::Int64, num_gas::Int64, csv
 end
 
 
-########################################################################################
-#
+############################################
 # linear algebra functions: flow/pressure
-#
-# parabolic partial differential equations for gas flow and fluid flow are solved
-# in a single set of functions, with absolute pressure values for the (composite) gas
-# phase and capillary pressures for the water phase
-#
-########################################################################################
+############################################
 
 
 function LHSmatrixFlow(connect::Array{Connect,1}, node::Array{Node,1}, knobs::Knobs, dt::Float64, num_nodes::Int64)
@@ -663,15 +655,9 @@ function RHSvectorFlow(connect::Array{Connect,1}, node::Array{Node,1}, num_nodes
 end
 
 
-#####################################################################################################
-#
+###############################################
 # linear algebra functions: aqueous transport
-#
-# advective-dispersive component transport for the aqueous and gaseous phases (hyperbolic-parabolic PDEs)
-# are handled by a separate set of functions from the pressure equations and employ a user-specified 
-# upstream weighting factors
-#
-#####################################################################################################
+###############################################
 
 
 function LHSmatrixTrans(connect::Array{Connect,1}, node::Array{Node,1}, knobs::Knobs, dt::Float64, num_nodes::Int64)
@@ -770,14 +756,9 @@ function RHSvectorTransAq(connect::Array{Connect,1}, node::Array{Node,1}, S_aq::
 end
 
 
-####################################################################################################
-#
+###############################################
 # linear algebra functions: gas transport
-#
-# these functions are analogous to the aqueous phase equivalents, but there are enough differences
-# to warrant separate function definitions
-#
-####################################################################################################
+###############################################
 
 
 function UpdateTransGasLHS(connect::Array{Connect,1}, node::Array{Node,1}, knobs::Knobs, dt::Float64, num_nodes::Int64, igas::Int64)
@@ -844,7 +825,7 @@ end
 ######################################
 
 
-function gw_trans(t_end::Float64, mon_well::Int64)
+function gas_water_trans(t_end::Float64, mon_well::Int64)
 
 	knobs = GetKnobs() 																# read in computational parameters
 	comp, gas, num_comps, num_gas = ReadComps() 									# read chemical component properties
@@ -974,6 +955,5 @@ end
 
 # t_end = model end-time
 # mon_well = node index number corresponding to monitor location (node no.)
-#
 
-gw_trans(86400., 1) 		# --> gw_trans(t_end, mon_well)
+gas_water_trans(8640., 2)
